@@ -1,3 +1,13 @@
+// ==UserScript==
+// @name         ChatGPT Prompt Queue (Enter-to-Queue While Sending)
+// @namespace    https://chatgpt.com/
+// @version      1.0.3
+// @description  Queue prompts while a message is sending; show/manage a visual queue; auto-sends next when idle.
+// @match        https://chatgpt.com/*
+// @run-at       document-idle
+// @grant        none
+// ==/UserScript==
+
 (function () {
     "use strict";
 
@@ -295,7 +305,7 @@
                 return;
             }
             simulateEnterOn(editor);
-        }, 1000);
+        }, 750);
     }
 
     function keydownHandler(e) {
