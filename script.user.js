@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Prompt Queue
 // @namespace    https://chatgpt.com/
-// @version      1.0.5
+// @version      1.0.6
 // @description  Queue prompts while a message is sending
 // @match        https://chatgpt.com/*
 // @run-at       document-idle
@@ -108,7 +108,6 @@
     <div id="cgpt-queue-header">
       <div id="cgpt-queue-title">Queue (0)</div>
       <div id="cgpt-queue-actions">
-        <button id="cgpt-queue-sendnext" class="cgpt-btn" title="Force send next now">Send next</button>
         <button id="cgpt-queue-clear" class="cgpt-btn" title="Clear all">Clear</button>
       </div>
     </div>
@@ -119,7 +118,6 @@
   const titleEl = $("#cgpt-queue-title", panel);
   const listEl = $("#cgpt-queue-list", panel);
   const clearBtn = $("#cgpt-queue-clear", panel);
-  const sendNextBtn = $("#cgpt-queue-sendnext", panel);
 
   function summarize(lines, maxLen = 180) {
     const text = lines.join("\n");
@@ -167,10 +165,6 @@
     queue = [];
     saveQueue();
     renderQueue();
-  });
-
-  sendNextBtn.addEventListener("click", () => {
-    trySendNext();
   });
 
   function editorToLines(editor) {
