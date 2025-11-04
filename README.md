@@ -7,4 +7,5 @@ Simple userscript to queue messages to ChatGPT. Basically, it's https://chromewe
 3. Done!
 4. The extension auto updates to this github by default, but you can disable if from the extension if you want.
 
-![Show](assets/a.gif)
+# Showcase
+![Show](assets/show.gif)
