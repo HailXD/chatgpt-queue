@@ -35,11 +35,15 @@
 
   let queue = [];
   let dispatchLock = false;
+  let pendingDraft = null;
 
   function loadQueue() {
     try {
       const raw = localStorage.getItem(LS_KEY);
-      queue = raw ? JSON.parse(raw) : [];
+      const parsed = raw ? JSON.parse(raw) : [];
+      queue = Array.isArray(parsed)
+        ? parsed.filter((item) => !(item && item.isDraft))
+        : [];
     } catch {
       queue = [];
     }
@@ -98,6 +102,19 @@
 }
 .cgpt-remove:hover { background: rgba(255,255,255,0.15); }
 .cgpt-empty { padding: 14px 12px; color: #c9c9c9; font-size: 12px; }
+.cgpt-queue-item--draft {
+  background: rgba(255,153,0,0.16);
+  border-left: 3px solid rgba(255,153,0,0.85);
+}
+.cgpt-queue-tag {
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  background: rgba(255,153,0,0.18);
+  color: #ffb347;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
 `;
   const styleTag = document.createElement("style");
   styleTag.textContent = styles;
@@ -138,6 +155,7 @@
     queue.forEach((item, idx) => {
       const row = document.createElement("div");
       row.className = "cgpt-queue-item";
+      if (item && item.isDraft) row.classList.add("cgpt-queue-item--draft");
 
       const text = document.createElement("div");
       text.className = "cgpt-queue-text";
@@ -150,11 +168,20 @@
       remove.className = "cgpt-remove";
       remove.textContent = "Remove";
       remove.addEventListener("click", () => {
-        queue.splice(idx, 1);
+        const removed = queue.splice(idx, 1)[0];
+        if (pendingDraft && removed && removed.id === pendingDraft.id) {
+          pendingDraft.restore = false;
+        }
         saveQueue();
         renderQueue();
       });
 
+      if (item && item.isDraft) {
+        const badge = document.createElement("span");
+        badge.className = "cgpt-queue-tag";
+        badge.textContent = "Saved draft";
+        tools.appendChild(badge);
+      }
       tools.appendChild(remove);
       row.appendChild(text);
       row.appendChild(tools);
@@ -164,6 +191,7 @@
 
   clearBtn.addEventListener("click", () => {
     queue = [];
+    if (pendingDraft) pendingDraft.restore = false;
     saveQueue();
     renderQueue();
   });
@@ -222,14 +250,17 @@
     }, 80);
   }
 
-  function enqueue(lines) {
-    queue.push({
+  function enqueue(lines, opts = {}) {
+    const item = {
       id: String(Date.now()) + Math.random().toString(36).slice(2),
       lines,
       created: Date.now(),
-    });
+      ...opts,
+    };
+    queue.push(item);
     saveQueue();
     renderQueue();
+    return item;
   }
 
   function dequeue() {
@@ -239,8 +270,36 @@
     return item;
   }
 
+  function removeQueueItemById(id) {
+    if (!id) return;
+    const idx = queue.findIndex((item) => item && item.id === id);
+    if (idx === -1) return;
+    queue.splice(idx, 1);
+    saveQueue();
+    renderQueue();
+  }
+
+  function restorePendingDraft(editor) {
+    if (!pendingDraft) return;
+    const { id, lines, restore } = pendingDraft;
+    pendingDraft = null;
+    if (restore !== false && editor) {
+      linesToEditor(lines, editor);
+    }
+    removeQueueItemById(id);
+  }
+
   function hasContent(lines) {
     return lines.some((ln) => (ln ?? "").trim().length > 0);
+  }
+
+  function linesMatch(a, b) {
+    if (!Array.isArray(a) || !Array.isArray(b)) return false;
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i += 1) {
+      if ((a[i] ?? "") !== (b[i] ?? "")) return false;
+    }
+    return true;
   }
 
   function waitFor(pred, timeout = 5000, interval = 50) {
@@ -265,8 +324,26 @@
 
     dispatchLock = true;
 
+    const currentLines = editorToLines(editor);
+    const nextItem = queue[0];
+    if (
+      !pendingDraft &&
+      hasContent(currentLines) &&
+      (!nextItem || !linesMatch(currentLines, nextItem.lines))
+    ) {
+      const draftItem = enqueue(currentLines, { isDraft: true });
+      pendingDraft = {
+        id: draftItem.id,
+        lines: currentLines.slice(),
+        restore: true,
+      };
+    }
+
     const item = dequeue();
-    if (!item) { dispatchLock = false; return; }
+    if (!item) {
+      dispatchLock = false;
+      return;
+    }
 
     linesToEditor(item.lines, editor);
 
@@ -278,6 +355,7 @@
 
     await waitFor(() => isSending(), 2000, 50);
     if (!isSending()) {
+      restorePendingDraft(editor);
       dispatchLock = false;
       setTimeout(trySendNext, 300);
       return;
@@ -285,9 +363,16 @@
 
     await waitFor(() => !isSending(), 120000, 100);
 
-    dispatchLock = false;
-
-    setTimeout(trySendNext, 50);
+    const finalize = () => {
+      if (pendingDraft && isSending()) {
+        setTimeout(finalize, 200);
+        return;
+      }
+      restorePendingDraft(editor);
+      dispatchLock = false;
+      setTimeout(trySendNext, 50);
+    };
+    finalize();
   }
 
   function keydownHandler(e) {
