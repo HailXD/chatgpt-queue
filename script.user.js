@@ -293,15 +293,6 @@
     return lines.some((ln) => (ln ?? "").trim().length > 0);
   }
 
-  function linesMatch(a, b) {
-    if (!Array.isArray(a) || !Array.isArray(b)) return false;
-    if (a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i += 1) {
-      if ((a[i] ?? "") !== (b[i] ?? "")) return false;
-    }
-    return true;
-  }
-
   function waitFor(pred, timeout = 5000, interval = 50) {
     return new Promise((resolve) => {
       const start = Date.now();
@@ -325,12 +316,7 @@
     dispatchLock = true;
 
     const currentLines = editorToLines(editor);
-    const nextItem = queue[0];
-    if (
-      !pendingDraft &&
-      hasContent(currentLines) &&
-      (!nextItem || !linesMatch(currentLines, nextItem.lines))
-    ) {
+    if (!pendingDraft && hasContent(currentLines)) {
       const draftItem = enqueue(currentLines, { isDraft: true });
       pendingDraft = {
         id: draftItem.id,
@@ -361,18 +347,12 @@
       return;
     }
 
+    restorePendingDraft(editor);
+
     await waitFor(() => !isSending(), 120000, 100);
 
-    const finalize = () => {
-      if (pendingDraft && isSending()) {
-        setTimeout(finalize, 200);
-        return;
-      }
-      restorePendingDraft(editor);
-      dispatchLock = false;
-      setTimeout(trySendNext, 50);
-    };
-    finalize();
+    dispatchLock = false;
+    setTimeout(trySendNext, 50);
   }
 
   function keydownHandler(e) {
