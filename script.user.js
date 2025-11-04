@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Prompt Queue
 // @namespace    https://chatgpt.com/
-// @version      1.0.6
+// @version      1.0.7
 // @description  Queue prompts while a message is sending
 // @match        https://chatgpt.com/*
 // @run-at       document-idle
