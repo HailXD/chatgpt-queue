@@ -6,6 +6,7 @@
 // @match        https://chatgpt.com/*
 // @run-at       document-idle
 // @grant        none
+// @downloadURL  https://github.com/HailXD/chatgpt-queue/raw/refs/heads/main/script.user.js
 // ==/UserScript==
 
 (function () {
