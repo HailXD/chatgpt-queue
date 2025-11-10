@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Prompt Queue
 // @namespace    https://chatgpt.com/
-// @version      1.0.8
+// @version      1.0.9
 // @description  Queue prompts while a message is sending
 // @match        https://chatgpt.com/*
 // @run-at       document-idle
@@ -97,11 +97,39 @@
 .cgpt-btn:hover { background: rgba(255,255,255,0.14); }
 #cgpt-queue-list { max-height: calc(40vh - 44px); overflow: auto; }
 .cgpt-queue-item {
+  position: relative;
   display: grid; grid-template-columns: 1fr auto; gap: 8px;
-  padding: 10px 12px; border-bottom: 1px dashed rgba(255,255,255,0.08);
+  padding: 12px 12px 16px;
 }
-.cgpt-queue-item:last-child { border-bottom: none; }
-.cgpt-queue-text { white-space: pre-wrap; word-break: break-word; color: #eaeaea; font-size: 12px; }
+.cgpt-queue-item:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 6px;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg,
+    rgba(255,255,255,0),
+    rgba(255,255,255,0.25),
+    rgba(255,255,255,0)
+  );
+  opacity: 0.7;
+}
+.cgpt-queue-text {
+  display: flex; gap: 8px; align-items: flex-start;
+  white-space: pre-wrap; word-break: break-word;
+  font-size: 12px; color: #eaeaea;
+}
+.cgpt-queue-summary { flex: 1; color: #eaeaea; }
+.cgpt-queue-index {
+  font-weight: 600;
+  color: rgba(255,255,255,0.75);
+  font-size: 11px;
+  min-width: 18px;
+  text-align: right;
+  letter-spacing: 0.02em;
+}
 .cgpt-queue-meta { display: flex; align-items: center; gap: 6px; }
 .cgpt-remove,
 .cgpt-edit {
@@ -187,7 +215,17 @@
 
       const text = document.createElement("div");
       text.className = "cgpt-queue-text";
-      text.textContent = summarize(item.lines);
+
+      const index = document.createElement("span");
+      index.className = "cgpt-queue-index";
+      index.textContent = String(idx + 1);
+
+      const summary = document.createElement("span");
+      summary.className = "cgpt-queue-summary";
+      summary.textContent = summarize(item.lines);
+
+      text.appendChild(index);
+      text.appendChild(summary);
 
       const tools = document.createElement("div");
       tools.className = "cgpt-queue-meta";
