@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Prompt Queue
 // @namespace    https://chatgpt.com/
-// @version      1.0.7
+// @version      1.0.8
 // @description  Queue prompts while a message is sending
 // @match        https://chatgpt.com/*
 // @run-at       document-idle
@@ -71,6 +71,14 @@
   font: 13px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   backdrop-filter: blur(6px);
 }
+#cgpt-queue-panel.cgpt-collapsed {
+  width: auto;
+  min-width: 120px;
+}
+#cgpt-queue-panel.cgpt-collapsed #cgpt-queue-actions,
+#cgpt-queue-panel.cgpt-collapsed #cgpt-queue-list {
+  display: none;
+}
 #cgpt-queue-header {
   display: flex;
   align-items: center;
@@ -79,7 +87,7 @@
   background: rgba(255,255,255,0.06);
   border-bottom: 1px solid rgba(255,255,255,0.08);
 }
-#cgpt-queue-title { font-weight: 600; font-size: 13px; }
+#cgpt-queue-title { font-weight: 600; font-size: 13px; cursor: pointer; }
 #cgpt-queue-actions { display: flex; gap: 8px; }
 .cgpt-btn {
   cursor: pointer; user-select: none; padding: 4px 8px;
@@ -95,12 +103,14 @@
 .cgpt-queue-item:last-child { border-bottom: none; }
 .cgpt-queue-text { white-space: pre-wrap; word-break: break-word; color: #eaeaea; font-size: 12px; }
 .cgpt-queue-meta { display: flex; align-items: center; gap: 6px; }
-.cgpt-remove {
+.cgpt-remove,
+.cgpt-edit {
   cursor: pointer; padding: 2px 6px; border-radius: 6px;
   border: 1px solid rgba(255,255,255,0.18);
   background: rgba(255,255,255,0.07); color: #fff; font-size: 11px;
 }
-.cgpt-remove:hover { background: rgba(255,255,255,0.15); }
+.cgpt-remove:hover,
+.cgpt-edit:hover { background: rgba(255,255,255,0.15); }
 .cgpt-empty { padding: 14px 12px; color: #c9c9c9; font-size: 12px; }
 .cgpt-queue-item--draft {
   background: rgba(255,153,0,0.16);
@@ -136,6 +146,24 @@
   const titleEl = $("#cgpt-queue-title", panel);
   const listEl = $("#cgpt-queue-list", panel);
   const clearBtn = $("#cgpt-queue-clear", panel);
+  const headerEl = $("#cgpt-queue-header", panel);
+  const actionsEl = $("#cgpt-queue-actions", panel);
+
+  let isCollapsed = false;
+
+  function setCollapsed(state) {
+    isCollapsed = Boolean(state);
+    panel.classList.toggle("cgpt-collapsed", isCollapsed);
+  }
+
+  setCollapsed(isCollapsed);
+  if (headerEl) {
+    headerEl.title = "Click to expand or collapse the queue";
+    headerEl.addEventListener("click", (event) => {
+      if (actionsEl && actionsEl.contains(event.target)) return;
+      setCollapsed(!isCollapsed);
+    });
+  }
 
   function summarize(lines, maxLen = 180) {
     const text = lines.join("\n");
@@ -164,16 +192,23 @@
       const tools = document.createElement("div");
       tools.className = "cgpt-queue-meta";
 
+      const edit = document.createElement("button");
+      edit.className = "cgpt-edit";
+      edit.textContent = "Edit";
+      edit.addEventListener("click", () => {
+        const removed = removeQueueItemAt(idx);
+        if (!removed) return;
+        const editor = getEditor();
+        if (editor) {
+          linesToEditor(removed.lines || [""], editor);
+        }
+      });
+
       const remove = document.createElement("button");
       remove.className = "cgpt-remove";
       remove.textContent = "Remove";
       remove.addEventListener("click", () => {
-        const removed = queue.splice(idx, 1)[0];
-        if (pendingDraft && removed && removed.id === pendingDraft.id) {
-          pendingDraft.restore = false;
-        }
-        saveQueue();
-        renderQueue();
+        removeQueueItemAt(idx);
       });
 
       if (item && item.isDraft) {
@@ -182,6 +217,7 @@
         badge.textContent = "Saved draft";
         tools.appendChild(badge);
       }
+      tools.appendChild(edit);
       tools.appendChild(remove);
       row.appendChild(text);
       row.appendChild(tools);
@@ -270,13 +306,24 @@
     return item;
   }
 
+  function removeQueueItemAt(index) {
+    if (typeof index !== "number" || index < 0 || index >= queue.length) {
+      return null;
+    }
+    const removed = queue.splice(index, 1)[0];
+    if (pendingDraft && removed && removed.id === pendingDraft.id) {
+      pendingDraft.restore = false;
+    }
+    saveQueue();
+    renderQueue();
+    return removed;
+  }
+
   function removeQueueItemById(id) {
     if (!id) return;
     const idx = queue.findIndex((item) => item && item.id === id);
     if (idx === -1) return;
-    queue.splice(idx, 1);
-    saveQueue();
-    renderQueue();
+    removeQueueItemAt(idx);
   }
 
   function restorePendingDraft(editor) {
