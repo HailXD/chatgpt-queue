@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Prompt Queue
 // @namespace    https://chatgpt.com/
-// @version      1.0.9
+// @version      1.0.10
 // @description  Queue prompts while a message is sending
 // @match        https://chatgpt.com/*
 // @run-at       document-idle
@@ -31,7 +31,34 @@
     return $('[data-testid="send-button"], [aria-label="Send"]');
   }
 
-  const LS_KEY = "cgpt_prompt_queue_v1";
+  // Per-tab storage so queues don't leak across tabs.
+  const STORAGE_KEY = "cgpt_prompt_queue_v1";
+  const memoryStorage = Object.create(null);
+  const storage = {
+    getItem(key) {
+      try {
+        return sessionStorage.getItem(key);
+      } catch {
+        return Object.prototype.hasOwnProperty.call(memoryStorage, key)
+          ? memoryStorage[key]
+          : null;
+      }
+    },
+    setItem(key, value) {
+      try {
+        sessionStorage.setItem(key, value);
+      } catch {
+        memoryStorage[key] = String(value);
+      }
+    },
+    removeItem(key) {
+      try {
+        sessionStorage.removeItem(key);
+      } catch {
+        delete memoryStorage[key];
+      }
+    },
+  };
 
   let queue = [];
   let dispatchLock = false;
@@ -39,18 +66,19 @@
 
   function loadQueue() {
     try {
-      const raw = localStorage.getItem(LS_KEY);
+      const raw = storage.getItem(STORAGE_KEY);
       const parsed = raw ? JSON.parse(raw) : [];
       queue = Array.isArray(parsed)
         ? parsed.filter((item) => !(item && item.isDraft))
         : [];
+      storage.setItem(STORAGE_KEY, JSON.stringify(queue));
     } catch {
       queue = [];
     }
   }
   function saveQueue() {
     try {
-      localStorage.setItem(LS_KEY, JSON.stringify(queue));
+      storage.setItem(STORAGE_KEY, JSON.stringify(queue));
     } catch {}
   }
 
