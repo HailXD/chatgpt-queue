@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Prompt Queue
 // @namespace    https://chatgpt.com/
-// @version      1.1.0
+// @version      1.1.1
 // @description  Queue prompts while a message is sending
 // @match        https://chatgpt.com/*
 // @run-at       document-idle
@@ -25,6 +25,14 @@
 
   function isSending() {
     return Boolean($('[data-testid="stop-button"]'));
+  }
+
+  function hasLoadingShimmer() {
+    return Boolean($(".loading-shimmer"));
+  }
+
+  function isBusy() {
+    return isSending() || hasLoadingShimmer();
   }
 
   function getSendButton() {
@@ -348,7 +356,7 @@
     el.dispatchEvent(new KeyboardEvent("keyup", evInit));
     setTimeout(() => {
       const sendBtn = getSendButton();
-      if (sendBtn && !isSending()) sendBtn.click();
+      if (sendBtn && !isBusy()) sendBtn.click();
     }, 80);
   }
 
@@ -421,7 +429,7 @@
   async function trySendNext() {
     if (dispatchLock) return;
     if (!queue.length) return;
-    if (isSending()) return;
+    if (isBusy()) return;
 
     const editor = getEditor();
     if (!editor) return;
@@ -462,7 +470,7 @@
 
     restorePendingDraft(editor);
 
-    await waitFor(() => !isSending(), 120000, 100);
+    await waitFor(() => !isBusy(), 120000, 100);
 
     dispatchLock = false;
     setTimeout(trySendNext, 50);
@@ -475,7 +483,7 @@
     if (!editor) return;
     if (!editor.contains(e.target) && e.target !== editor) return;
 
-    if (!isSending()) return;
+    if (!isBusy()) return;
 
     e.preventDefault();
     e.stopPropagation();
