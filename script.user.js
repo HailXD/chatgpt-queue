@@ -1,10 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Prompt Queue
-// @namespace    https://chatgpt.com/
 // @version      1.1.1
-// @description  Queue prompts while a message is sending
 // @match        https://chatgpt.com/*
-// @run-at       document-idle
 // @grant        none
 // @downloadURL  https://github.com/HailXD/chatgpt-queue/raw/refs/heads/main/script.user.js
 // ==/UserScript==
