@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         ChatGPT Prompt Queue
-// @version      1.1.1
+// @version      1.1.2
 // @match        https://chatgpt.com/*
 // @grant        none
 // @downloadURL  https://github.com/HailXD/chatgpt-queue/raw/refs/heads/main/script.user.js
@@ -210,7 +210,7 @@
   const headerEl = $("#cgpt-queue-header", panel);
   const actionsEl = $("#cgpt-queue-actions", panel);
 
-  let isCollapsed = false;
+  let isCollapsed = true;
 
   function setCollapsed(state) {
     isCollapsed = Boolean(state);
