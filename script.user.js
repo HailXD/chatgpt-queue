@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         ChatGPT Prompt Queue
-// @version      1.1.2
+// @version      1.1.3
 // @match        https://chatgpt.com/*
 // @grant        none
 // @downloadURL  https://github.com/HailXD/chatgpt-queue/raw/refs/heads/main/script.user.js
@@ -38,6 +38,8 @@
 
   // Per-tab storage so queues don't leak across tabs.
   const STORAGE_KEY = "cgpt_prompt_queue_v1";
+  const COLLAPSE_KEY = "cgpt_queue_open";
+  const EXPANDED_VALUE = "1";
   const memoryStorage = Object.create(null);
   const storage = {
     getItem(key) {
@@ -84,6 +86,21 @@
   function saveQueue() {
     try {
       storage.setItem(STORAGE_KEY, JSON.stringify(queue));
+    } catch {}
+  }
+
+  function loadCollapsed() {
+    try {
+      return localStorage.getItem(COLLAPSE_KEY) !== EXPANDED_VALUE;
+    } catch {
+      return true;
+    }
+  }
+
+  function saveCollapsed(state) {
+    try {
+      if (state) localStorage.removeItem(COLLAPSE_KEY);
+      else localStorage.setItem(COLLAPSE_KEY, EXPANDED_VALUE);
     } catch {}
   }
 
@@ -210,11 +227,12 @@
   const headerEl = $("#cgpt-queue-header", panel);
   const actionsEl = $("#cgpt-queue-actions", panel);
 
-  let isCollapsed = true;
+  let isCollapsed = loadCollapsed();
 
   function setCollapsed(state) {
     isCollapsed = Boolean(state);
     panel.classList.toggle("cgpt-collapsed", isCollapsed);
+    saveCollapsed(isCollapsed);
   }
 
   setCollapsed(isCollapsed);
