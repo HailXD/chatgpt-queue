@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         ChatGPT Prompt Queue
-// @version      1.1.3
+// @version      1.1.4
 // @match        https://chatgpt.com/*
 // @grant        none
 // @downloadURL  https://github.com/HailXD/chatgpt-queue/raw/refs/heads/main/script.user.js
@@ -204,44 +204,71 @@
   letter-spacing: 0.04em;
 }
 `;
-  const styleTag = document.createElement("style");
-  styleTag.textContent = styles;
-  document.head.appendChild(styleTag);
+  const STYLE_ID = "cgpt-queue-style";
+  const PANEL_ID = "cgpt-queue-panel";
 
-  const panel = document.createElement("div");
-  panel.id = "cgpt-queue-panel";
-  panel.innerHTML = `
-    <div id="cgpt-queue-header">
-      <div id="cgpt-queue-title">Queue (0)</div>
-      <div id="cgpt-queue-actions">
-        <button id="cgpt-queue-clear" class="cgpt-btn" title="Clear all">Clear</button>
+  let panel, titleEl, listEl, clearBtn, headerEl, actionsEl;
+
+  function injectPanel() {
+    if (!document.getElementById(STYLE_ID)) {
+      const styleTag = document.createElement("style");
+      styleTag.id = STYLE_ID;
+      styleTag.textContent = styles;
+      document.head.appendChild(styleTag);
+    }
+
+    panel = document.createElement("div");
+    panel.id = PANEL_ID;
+    panel.innerHTML = `
+      <div id="cgpt-queue-header">
+        <div id="cgpt-queue-title">Queue (0)</div>
+        <div id="cgpt-queue-actions">
+          <button id="cgpt-queue-clear" class="cgpt-btn" title="Clear all">Clear</button>
+        </div>
       </div>
-    </div>
-    <div id="cgpt-queue-list"><div class="cgpt-empty">No queued prompts.</div></div>
-  `;
-  document.body.appendChild(panel);
+      <div id="cgpt-queue-list"><div class="cgpt-empty">No queued prompts.</div></div>
+    `;
+    document.body.appendChild(panel);
 
-  const titleEl = $("#cgpt-queue-title", panel);
-  const listEl = $("#cgpt-queue-list", panel);
-  const clearBtn = $("#cgpt-queue-clear", panel);
-  const headerEl = $("#cgpt-queue-header", panel);
-  const actionsEl = $("#cgpt-queue-actions", panel);
+    titleEl = $("#cgpt-queue-title", panel);
+    listEl = $("#cgpt-queue-list", panel);
+    clearBtn = $("#cgpt-queue-clear", panel);
+    headerEl = $("#cgpt-queue-header", panel);
+    actionsEl = $("#cgpt-queue-actions", panel);
+
+    setCollapsed(isCollapsed);
+    bindPanelEvents();
+    renderQueue();
+  }
+
+  function bindPanelEvents() {
+    if (headerEl) {
+      headerEl.title = "Click to expand or collapse the queue";
+      headerEl.addEventListener("click", (event) => {
+        if (actionsEl && actionsEl.contains(event.target)) return;
+        setCollapsed(!isCollapsed);
+      });
+    }
+    clearBtn.addEventListener("click", () => {
+      queue = [];
+      if (pendingDraft) pendingDraft.restore = false;
+      saveQueue();
+      renderQueue();
+    });
+  }
+
+  function ensurePanel() {
+    if (document.getElementById(PANEL_ID)) return;
+    injectPanel();
+    reattachObserver();
+  }
 
   let isCollapsed = loadCollapsed();
 
   function setCollapsed(state) {
     isCollapsed = Boolean(state);
-    panel.classList.toggle("cgpt-collapsed", isCollapsed);
+    if (panel) panel.classList.toggle("cgpt-collapsed", isCollapsed);
     saveCollapsed(isCollapsed);
-  }
-
-  setCollapsed(isCollapsed);
-  if (headerEl) {
-    headerEl.title = "Click to expand or collapse the queue";
-    headerEl.addEventListener("click", (event) => {
-      if (actionsEl && actionsEl.contains(event.target)) return;
-      setCollapsed(!isCollapsed);
-    });
   }
 
   function summarize(lines, maxLen = 180) {
@@ -314,12 +341,7 @@
     });
   }
 
-  clearBtn.addEventListener("click", () => {
-    queue = [];
-    if (pendingDraft) pendingDraft.restore = false;
-    saveQueue();
-    renderQueue();
-  });
+  // Clear-button listener is now bound inside bindPanelEvents()
 
   function editorToLines(editor) {
     const ps = $$("p", editor);
@@ -511,16 +533,22 @@
   }
 
   loadQueue();
-  renderQueue();
+  injectPanel();
 
   document.addEventListener("keydown", keydownHandler, true);
 
   setInterval(() => {
+    ensurePanel();
     if (!dispatchLock && !isSending()) trySendNext();
   }, 600);
 
-  const obs = new MutationObserver(() => {
-    if (!dispatchLock && !isSending()) trySendNext();
-  });
-  obs.observe(document.body, { childList: true, subtree: true });
+  let obs;
+  function reattachObserver() {
+    if (obs) obs.disconnect();
+    obs = new MutationObserver(() => {
+      if (!dispatchLock && !isSending()) trySendNext();
+    });
+    obs.observe(document.body, { childList: true, subtree: true });
+  }
+  reattachObserver();
 })();
